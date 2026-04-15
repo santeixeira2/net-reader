@@ -1,0 +1,5 @@
+fastapi
+uvicorn
+speedtest-cli
+psutil
+pyserial

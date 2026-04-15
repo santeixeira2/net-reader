@@ -1,0 +1,41 @@
+{
+  "build": {
+    "core": "stm32",
+    "cpu": "cortex-m4",
+    "extra_flags": "-DSTM32WB -DSTM32WB5Mxx",
+    "f_cpu": "64000000L",
+    "mcu": "stm32wb5mm",
+    "product_line": "STM32WB5Mxx",
+    "variant": "STM32WBxx/WB5MMGH"
+  },
+  "connectivity": [
+    "bluetooth"
+  ],
+  "debug": {
+    "default_tools": [
+      "stlink"
+    ],
+    "openocd_board": "st_nucleo_wb55",
+    "jlink_device": "STM32WB5MMG",
+    "onboard_tools": [
+      "stlink"
+    ]
+  },
+  "frameworks": [
+    "arduino"
+  ],
+  "name": "STM32WB5MM-DK",
+  "upload": {
+    "maximum_ram_size": 196608,
+    "maximum_size": 1048576,
+    "protocol": "stlink",
+    "protocols": [
+      "jlink",
+      "cmsis-dap",
+      "stlink",
+      "blackmagic"
+    ]
+  },
+  "url": "https://www.st.com/en/evaluation-tools/stm32wb5mm-dk.html",
+  "vendor": "ST"
+}
