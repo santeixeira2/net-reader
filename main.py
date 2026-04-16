@@ -114,7 +114,7 @@ def loop_speedtest():
             state["status"] = "testing"
             log.info("Starting speed test ...")
             st = speedtest.Speedtest(secure=True)
-            st.get_servers([])
+            st.get_best_server()
             state["ping"]     = st.results.ping
             state["download"] = st.download() / 1_000_000
             state["upload"]   = st.upload()   / 1_000_000

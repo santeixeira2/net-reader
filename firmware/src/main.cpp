@@ -49,13 +49,6 @@ static uint8_t spinnerIdx = 0;
 static String serialBuf;
 
 void parseSerial() {
-    static uint32_t lastHeartbeat = 0;
-    if (millis() - lastHeartbeat > 1000) {
-        Serial.print("ALIVE avail=");
-        Serial.println(Serial.available());
-        lastHeartbeat = millis();
-    }
-
     while (Serial.available()) {
         char c = (char)Serial.read();
         if (c == '\n' || c == '\r') {
@@ -167,14 +160,7 @@ void drawWaiting() {
 //  Setup
 // --------------------------------------------------------------------------
 void setup() {
-#ifdef USBCON
-    // STM32WB requires HSI48 (48 MHz) as USB clock source
-    __HAL_RCC_HSI48_ENABLE();
-    while (!__HAL_RCC_GET_FLAG(RCC_FLAG_HSI48RDY)) {}
-    MODIFY_REG(RCC->CCIPR, RCC_CCIPR_CLK48SEL, 0U);
-#endif
     Serial.begin(115200);
-    delay(2000); // wait for USB CDC to enumerate on host
 
     u8g2.begin();
     u8g2.setContrast(200);
@@ -186,7 +172,7 @@ void setup() {
     u8g2.drawStr(20, 45, "Initializing...");
     u8g2.sendBuffer();
 
-    delay(1500);
+    delay(1000);
 }
 
 // --------------------------------------------------------------------------
