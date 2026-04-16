@@ -23,9 +23,7 @@ U8G2_SSD1306_128X64_NONAME_F_4W_HW_SPI u8g2(
     PC8    // RST — RST_DISP
 );
 
-// --------------------------------------------------------------------------
-//  Data from the FastAPI backend
-// --------------------------------------------------------------------------
+//  Data from the Python API
 struct NetData {
     float dl     = 0.0f;
     float ul     = 0.0f;
@@ -43,9 +41,8 @@ static uint32_t lastDataMs   = 0;
 static const char* spinnerFrames[] = { "|", "/", "-", "\\" };
 static uint8_t spinnerIdx = 0;
 
-// --------------------------------------------------------------------------
+
 //  Non-blocking serial reader — accumulates chars until '\n'
-// --------------------------------------------------------------------------
 static String serialBuf;
 
 void parseSerial() {
@@ -81,12 +78,6 @@ void parseSerial() {
 
 // --------------------------------------------------------------------------
 //  Dashboard layout  (128 × 64)
-//
-//   y= 0..14  Title + status badge
-//   y=15      separator
-//   y=16..42  DL / UL / Ping  (font 6x13)
-//   y=53      separator
-//   y=54..63  RX / TX realtime (font 5x8, baseline y=62)
 // --------------------------------------------------------------------------
 void drawDashboard() {
     u8g2.clearBuffer();
@@ -106,7 +97,7 @@ void drawDashboard() {
 
     u8g2.drawHLine(0, 14, 128);
 
-    // ── Speed test results ─────────────────────────────────────────
+    // Speed test results
     u8g2.setFont(u8g2_font_6x13_tr);
     char buf[32];
 
@@ -124,7 +115,7 @@ void drawDashboard() {
 
     u8g2.drawHLine(0, 53, 128);
 
-    // ── Real-time traffic ──────────────────────────────────────────
+    // Real-time traffic
     u8g2.setFont(u8g2_font_5x8_tr);
 
     snprintf(buf, sizeof(buf), "RX:%.2f", net.rx);
@@ -136,9 +127,8 @@ void drawDashboard() {
     u8g2.sendBuffer();
 }
 
-// --------------------------------------------------------------------------
 //  Waiting screen
-// --------------------------------------------------------------------------
+
 void drawWaiting() {
     u8g2.clearBuffer();
 
@@ -156,9 +146,8 @@ void drawWaiting() {
     u8g2.sendBuffer();
 }
 
-// --------------------------------------------------------------------------
 //  Setup
-// --------------------------------------------------------------------------
+
 void setup() {
     Serial.begin(115200);
 
@@ -175,9 +164,8 @@ void setup() {
     delay(1000);
 }
 
-// --------------------------------------------------------------------------
 //  Main loop
-// --------------------------------------------------------------------------
+
 void loop() {
     parseSerial();
 

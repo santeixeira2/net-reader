@@ -1,33 +1,21 @@
-import asyncio
 import json
 import logging
 import os
 import platform
 import threading
 import time
-from contextlib import asynccontextmanager
 
 import psutil
 import serial
 import speedtest
-import uvicorn
-from fastapi import FastAPI
 
-# ---------------------------------------------------------------------------
-# Configuration
-# ---------------------------------------------------------------------------
-SERIAL_PORT = os.getenv("SERIAL_PORT", "")        # Override via env var
-BAUD_RATE   = int(os.getenv("BAUD_RATE", "115200"))
-HOST        = os.getenv("HOST", "0.0.0.0")
-PORT        = int(os.getenv("PORT", "8000"))
-SPEEDTEST_INTERVAL = int(os.getenv("SPEEDTEST_INTERVAL", "300"))  # seconds
+SERIAL_PORT        = os.getenv("SERIAL_PORT", "")
+BAUD_RATE          = int(os.getenv("BAUD_RATE", "115200"))
+SPEEDTEST_INTERVAL = int(os.getenv("SPEEDTEST_INTERVAL", "300"))
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("speed-net")
 
-# ---------------------------------------------------------------------------
-# Shared state
-# ---------------------------------------------------------------------------
 state = {
     "download": 0.0,
     "upload":   0.0,
@@ -39,11 +27,7 @@ state = {
 
 ser = None
 
-# ---------------------------------------------------------------------------
-# Serial helpers
-# ---------------------------------------------------------------------------
 def _pick_serial_port() -> str:
-    """Return the first suitable serial port, or the configured one."""
     if SERIAL_PORT:
         return SERIAL_PORT
 
@@ -52,7 +36,6 @@ def _pick_serial_port() -> str:
     ports = list(serial.tools.list_ports.comports())
     log.info(f"Available serial ports: {[p.device for p in ports]}")
 
-    # Prefer STM32 / ST-Link devices
     stm_keywords = ["stm32", "st-link", "stlink", "usb serial", "usb com"]
     for p in ports:
         desc = (p.description or "").lower()
@@ -60,19 +43,15 @@ def _pick_serial_port() -> str:
             log.info(f"Found STM32-like port: {p.device} ({p.description})")
             return p.device
 
-    # Fallback: first available port
     if ports:
         log.info(f"Using first available port: {ports[0].device}")
         return ports[0].device
 
-    # Last resort: OS default
     default = "COM3" if platform.system() == "Windows" else "/dev/ttyACM0"
     log.warning(f"No serial ports found, falling back to {default}")
     return default
 
-
 def serial_connect():
-    """Open the serial port; log but don't crash on failure."""
     global ser
     port = _pick_serial_port()
     try:
@@ -81,9 +60,7 @@ def serial_connect():
     except Exception as e:
         log.warning(f"Serial unavailable ({port}): {e}")
 
-
 def send_data():
-    """Continuously push compact JSON to the serial port (1 Hz)."""
     while True:
         if ser and ser.is_open:
             payload = json.dumps({
@@ -102,12 +79,7 @@ def send_data():
                 log.error(f"Serial write error: {e}")
         time.sleep(1)
 
-
-# ---------------------------------------------------------------------------
-# Background workers
-# ---------------------------------------------------------------------------
 def loop_speedtest():
-    """Run a speed test every SPEEDTEST_INTERVAL seconds."""
     backoff = 10
     while True:
         try:
@@ -119,7 +91,7 @@ def loop_speedtest():
             state["download"] = st.download() / 1_000_000
             state["upload"]   = st.upload()   / 1_000_000
             state["status"]   = "ok"
-            backoff = 10  # reset backoff on success
+            backoff = 10
             log.info(
                 f"Speed test done — ↓ {state['download']:.1f} Mbps  "
                 f"↑ {state['upload']:.1f} Mbps  ◷ {state['ping']:.0f} ms"
@@ -132,9 +104,7 @@ def loop_speedtest():
             continue
         time.sleep(SPEEDTEST_INTERVAL)
 
-
 def traffic_loop():
-    """Measure real-time network throughput via psutil (≈1 Hz)."""
     while True:
         try:
             before = psutil.net_io_counters()
@@ -146,13 +116,7 @@ def traffic_loop():
             log.error(f"Traffic error: {e}")
             time.sleep(1)
 
-
-# ---------------------------------------------------------------------------
-# FastAPI app with modern lifespan
-# ---------------------------------------------------------------------------
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Startup / shutdown lifecycle."""
+if __name__ == "__main__":
     serial_connect()
     threads = [
         threading.Thread(target=loop_speedtest, daemon=True),
@@ -162,33 +126,4 @@ async def lifespan(app: FastAPI):
     for t in threads:
         t.start()
     log.info("All background workers started.")
-
-    yield  # ← app is running
-
-    # Shutdown
-    if ser and ser.is_open:
-        ser.close()
-        log.info("Serial port closed.")
-
-
-app = FastAPI(title="Speed-Net", lifespan=lifespan)
-
-
-@app.get("/status")
-def get_status():
-    """Return current network stats."""
-    return state
-
-
-@app.post("/speedtest")
-def trigger_speedtest():
-    """Trigger an on-demand speed test."""
-    threading.Thread(target=loop_speedtest, daemon=True).start()
-    return {"msg": "Speedtest started"}
-
-
-# ---------------------------------------------------------------------------
-# Entry point
-# ---------------------------------------------------------------------------
-if __name__ == "__main__":
-    uvicorn.run("main:app", host=HOST, port=PORT, reload=False)
+    threading.Event().wait()
