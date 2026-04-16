@@ -42,29 +42,33 @@ ser = None
 # ---------------------------------------------------------------------------
 # Serial helpers
 # ---------------------------------------------------------------------------
-SERIAL_CANDIDATES = [
-    "/dev/ttyACM0",
-    "/dev/ttyACM1",
-    "/dev/ttyUSB0",
-    "/dev/ttyUSB1",
-    "/dev/ttyS3",    # COM3 mapped in WSL
-    "/dev/ttyS4",    # COM4 mapped in WSL
-    "COM3",          # Native Windows fallback
-]
-
-
 def _pick_serial_port() -> str:
-    """Return the first serial port that exists, or the configured one."""
+    """Return the first suitable serial port, or the configured one."""
     if SERIAL_PORT:
         return SERIAL_PORT
 
-    for candidate in SERIAL_CANDIDATES:
-        try:
-            if os.path.exists(candidate):
-                return candidate
-        except Exception:
-            continue
-    return SERIAL_CANDIDATES[0]  # fallback
+    import serial.tools.list_ports
+
+    ports = list(serial.tools.list_ports.comports())
+    log.info(f"Available serial ports: {[p.device for p in ports]}")
+
+    # Prefer STM32 / ST-Link devices
+    stm_keywords = ["stm32", "st-link", "stlink", "usb serial", "usb com"]
+    for p in ports:
+        desc = (p.description or "").lower()
+        if any(kw in desc for kw in stm_keywords):
+            log.info(f"Found STM32-like port: {p.device} ({p.description})")
+            return p.device
+
+    # Fallback: first available port
+    if ports:
+        log.info(f"Using first available port: {ports[0].device}")
+        return ports[0].device
+
+    # Last resort: OS default
+    default = "COM3" if platform.system() == "Windows" else "/dev/ttyACM0"
+    log.warning(f"No serial ports found, falling back to {default}")
+    return default
 
 
 def serial_connect():
@@ -92,6 +96,8 @@ def send_data():
             }) + "\n"
             try:
                 ser.write(payload.encode())
+                ser.flush()
+                log.info(f"Serial sent: {payload.strip()}")
             except Exception as e:
                 log.error(f"Serial write error: {e}")
         time.sleep(1)
@@ -107,8 +113,8 @@ def loop_speedtest():
         try:
             state["status"] = "testing"
             log.info("Starting speed test ...")
-            st = speedtest.Speedtest()
-            st.get_best_server()
+            st = speedtest.Speedtest(secure=True)
+            st.get_servers([])
             state["ping"]     = st.results.ping
             state["download"] = st.download() / 1_000_000
             state["upload"]   = st.upload()   / 1_000_000
